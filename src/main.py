@@ -1,61 +1,90 @@
-from task_manager import TaskManager
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from src.task import Task
+
+app = FastAPI()
 
 
-def display_menu():
-    print("\n===== Task Manager =====")
-    print("1. Add task")
-    print("2. List tasks")
-    print("3. Mark task as completed")
-    print("4. Delete task")
-    print("5. Exit")
+# Request model for creating a task
+class TaskCreate(BaseModel):
+    title: str
 
 
-def get_task_id():
-    try:
-        return int(input("Enter task ID: "))
-    except ValueError:
-        print("Please enter a valid number.")
-        return None
+# Request model for updating a task
+class TaskUpdate(BaseModel):
+    title: str
+    completed: bool
 
 
-def main():
-    task_manager = TaskManager()
-
-    while True:
-        display_menu()
-
-        choice = input("Enter your choice: ")
-
-        if choice == "1":
-            title = input("Enter task title: ")
-
-            if title.strip():
-                task_manager.add_task(title)
-            else:
-                print("Task title cannot be empty.")
-
-        elif choice == "2":
-            task_manager.list_tasks()
-
-        elif choice == "3":
-            task_id = get_task_id()
-
-            if task_id is not None:
-                task_manager.mark_completed(task_id)
-
-        elif choice == "4":
-            task_id = get_task_id()
-
-            if task_id is not None:
-                task_manager.delete_task(task_id)
-
-        elif choice == "5":
-            print("Exiting Task Manager. Goodbye!")
-            break
-
-        else:
-            print("Invalid choice. Please try again.")
+# Response model
+class TaskResponse(BaseModel):
+    task_id: int
+    title: str
+    completed: bool
 
 
-if __name__ == "__main__":
-    main()
+# In-memory storage
+tasks = []
+next_id = 1
+
+
+# GET all tasks
+@app.get("/tasks", response_model=list[TaskResponse])
+def get_tasks():
+    return tasks
+
+
+# POST create a new task
+@app.post("/tasks", response_model=TaskResponse, status_code=201)
+def create_task(task: TaskCreate):
+    global next_id
+
+    new_task = Task(next_id, task.title)
+    tasks.append(new_task)
+    next_id += 1
+
+    return new_task
+
+
+# GET a single task by ID
+@app.get("/tasks/{task_id}", response_model=TaskResponse)
+def get_task(task_id: int):
+    for task in tasks:
+        if task.task_id == task_id:
+            return task
+
+    raise HTTPException(
+        status_code=404,
+        detail="Task not found"
+    )
+
+
+# PUT update a task
+@app.put("/tasks/{task_id}", response_model=TaskResponse)
+def update_task(task_id: int, task_data: TaskUpdate):
+    for task in tasks:
+        if task.task_id == task_id:
+            task.title = task_data.title
+            task.completed = task_data.completed
+            return task
+
+    raise HTTPException(
+        status_code=404,
+        detail="Task not found"
+    )
+
+
+# DELETE a task
+@app.delete("/tasks/{task_id}")
+def delete_task(task_id: int):
+    for task in tasks:
+        if task.task_id == task_id:
+            tasks.remove(task)
+            return {
+                "message": "Task deleted successfully"
+            }
+
+    raise HTTPException(
+        status_code=404,
+        detail="Task not found"
+    )
