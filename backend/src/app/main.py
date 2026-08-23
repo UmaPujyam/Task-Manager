@@ -1,5 +1,21 @@
 from fastapi import FastAPI
-from app.api.tasks import router as tasks_router
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.tasks import router as task_router
+
 
 app = FastAPI()
-app.include_router(tasks_router)
+
+
+# Allow React frontend to communicate with FastAPI
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# Task API routes
+app.include_router(task_router)
